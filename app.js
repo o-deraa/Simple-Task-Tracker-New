@@ -36,6 +36,11 @@ let currentFilter = 'semua';
 let loadState = 'loading';
 let loadError = '';
 let savingTask = false;
+let searchTerm = '';
+let matchIds = null;
+let searchTimer = null;
+let searchBusy = false;
+let requestNumber = 0;
 
 async function api(url, options = {}) {
   let response;
@@ -129,6 +134,7 @@ function formatDate(iso) {
 }
 
 function emptyMessage() {
+  if (matchIds && matchIds.size === 0) return `Tidak ada tugas yang cocok dengan "${searchTerm}".`;
   if (tasks.length === 0) return 'Belum ada tugas. Tambahkan lewat form di atas.';
   if (currentFilter === 'aktif') return 'Tidak ada tugas aktif pada deadline terdekat.';
   if (currentFilter === 'selesai') return 'Belum ada tugas selesai pada deadline terdekat.';
@@ -136,6 +142,7 @@ function emptyMessage() {
 }
 
 function longEmptyMessage() {
+  if (matchIds && matchIds.size === 0) return 'Tidak ada tugas jangka panjang yang cocok.';
   if (currentFilter === 'aktif') return 'Tidak ada tugas jangka panjang yang aktif.';
   if (currentFilter === 'selesai') return 'Belum ada tugas jangka panjang yang selesai.';
   return 'Belum ada tugas jangka panjang.';
@@ -207,7 +214,7 @@ function render() {
   loadingState.hidden = loadState !== 'loading';
   errorState.hidden = loadState !== 'error';
   taskList.hidden = !ready;
-  taskList.setAttribute('aria-busy', String(loadState === 'loading'));
+  taskList.setAttribute('aria-busy', String(loadState === 'loading' || searchBusy));
   kartuJangka.hidden = !ready;
   progressBox.hidden = !ready;
 
@@ -216,7 +223,7 @@ function render() {
   taskDeadline.disabled = !ready;
   tombolTambah.disabled = !ready || savingTask;
   tombolTambah.textContent = savingTask ? 'Menyimpan...' : '+ Tambah Tugas';
-  searchInput.disabled = true;
+  searchInput.disabled = !ready;
 
   if (loadState === 'error') errorMessage.textContent = loadError;
 
@@ -225,7 +232,8 @@ function render() {
     return;
   }
 
-  const daftarTampil = tasks.filter(matchesFilter);
+  const daftarTampil = tasks
+    .filter((task) => (!matchIds || matchIds.has(task.id)) && matchesFilter(task));
   const tugasDekat = daftarTampil.filter((task) => !isLongTerm(task)).sort(byDeadline);
   const tugasPanjang = daftarTampil.filter((task) => isLongTerm(task)).sort(byDeadline);
 
@@ -325,6 +333,7 @@ taskForm.addEventListener('submit', async (event) => {
       body: JSON.stringify({ judul, matkul, deadline }),
     });
     tasks.push(tugasBaru);
+    if (matchIds) matchIds.add(tugasBaru.id);
     taskForm.reset();
     taskTitle.focus();
   } catch (error) {
@@ -409,6 +418,35 @@ async function handleTaskClick(event) {
 
 taskList.addEventListener('click', handleTaskClick);
 longList.addEventListener('click', handleTaskClick);
+
+async function loadTaskList(query) {
+  const nomor = ++requestNumber;
+  searchBusy = true;
+  render();
+
+  try {
+    const url = query ? `/api/tugas?q=${encodeURIComponent(query)}` : '/api/tugas';
+    const hasil = await api(url);
+    if (nomor !== requestNumber) return; // respons usang, abaikan
+    matchIds = query ? new Set(hasil.map((task) => task.id)) : null;
+  } catch (error) {
+    if (nomor !== requestNumber) return;
+    showToast(`Pencarian gagal: ${error.message}`);
+  } finally {
+    if (nomor === requestNumber) {
+      searchBusy = false;
+      render();
+    }
+  }
+}
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchTerm = searchInput.value.trim();
+    loadTaskList(searchTerm);
+  }, 400);
+});
 
 function themeLabel(theme) {
   themeButton.textContent = theme === 'gelap' ? 'Mode terang' : 'Mode gelap';
