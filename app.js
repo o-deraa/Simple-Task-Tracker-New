@@ -35,6 +35,7 @@ let tasks = [];
 let currentFilter = 'semua';
 let loadState = 'loading';
 let loadError = '';
+let savingTask = false;
 
 async function api(url, options = {}) {
   let response;
@@ -213,7 +214,8 @@ function render() {
   taskTitle.disabled = !ready;
   taskCourse.disabled = !ready;
   taskDeadline.disabled = !ready;
-  tombolTambah.disabled = true;
+  tombolTambah.disabled = !ready || savingTask;
+  tombolTambah.textContent = savingTask ? 'Menyimpan...' : '+ Tambah Tugas';
   searchInput.disabled = true;
 
   if (loadState === 'error') errorMessage.textContent = loadError;
@@ -262,6 +264,98 @@ for (const button of filterButtons) {
 }
 
 retryButton.addEventListener('click', loadInitial);
+
+function showError(input, element, message) {
+  input.setAttribute('aria-invalid', 'true');
+  element.textContent = message;
+  element.hidden = false;
+}
+
+function clearError(input, element) {
+  input.removeAttribute('aria-invalid');
+  element.textContent = '';
+  element.hidden = true;
+}
+
+function showServerError(message) {
+  errorServer.textContent = message;
+  errorServer.hidden = false;
+}
+
+function clearServerError() {
+  errorServer.textContent = '';
+  errorServer.hidden = true;
+}
+
+taskForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (savingTask) return;
+
+  const judul = taskTitle.value.trim();
+  const matkul = taskCourse.value;
+  const deadline = taskDeadline.value;
+  let firstInvalid = null;
+
+  clearServerError();
+
+  if (judul.length < 3) {
+    showError(taskTitle, errorTitle, 'Judul tugas minimal 3 karakter.');
+    firstInvalid = taskTitle;
+  }
+  if (matkul === '') {
+    showError(taskCourse, errorCourse, 'Pilih mata kuliah dulu.');
+    if (!firstInvalid) firstInvalid = taskCourse;
+  }
+  if (deadline === '') {
+    showError(taskDeadline, errorDeadline, 'Deadline wajib diisi.');
+    if (!firstInvalid) firstInvalid = taskDeadline;
+  }
+  if (firstInvalid) {
+    firstInvalid.focus();
+    return;
+  }
+
+  savingTask = true;
+  render();
+
+  try {
+    const tugasBaru = await api('/api/tugas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ judul, matkul, deadline }),
+    });
+    tasks.push(tugasBaru);
+    taskForm.reset();
+    taskTitle.focus();
+  } catch (error) {
+    // Error 400 memuat pesan validasi dari server; tampilkan di kolom terkait.
+    if (error.status === 400 && error.payload && error.payload.field) {
+      const field = error.payload.field;
+      if (field === 'judul') showError(taskTitle, errorTitle, error.message);
+      else if (field === 'matkul') showError(taskCourse, errorCourse, error.message);
+      else if (field === 'deadline') showError(taskDeadline, errorDeadline, error.message);
+      else showServerError(error.message);
+    } else {
+      showServerError(`Gagal menyimpan tugas: ${error.message}`);
+    }
+  } finally {
+    savingTask = false;
+    render();
+  }
+});
+
+taskTitle.addEventListener('input', () => {
+  clearError(taskTitle, errorTitle);
+  clearServerError();
+});
+taskCourse.addEventListener('change', () => {
+  clearError(taskCourse, errorCourse);
+  clearServerError();
+});
+taskDeadline.addEventListener('input', () => {
+  clearError(taskDeadline, errorDeadline);
+  clearServerError();
+});
 
 function themeLabel(theme) {
   themeButton.textContent = theme === 'gelap' ? 'Mode terang' : 'Mode gelap';
