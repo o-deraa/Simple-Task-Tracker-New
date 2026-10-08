@@ -378,25 +378,36 @@ function showToast(message) {
 }
 
 async function toggleDone(task, done) {
+  const previous = task.selesai;
+  task.selesai = done; // optimistis: tampilan berubah lebih dulu
+  render();
+
   try {
     const updated = await api(`/api/tugas/${task.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ selesai: done }),
     });
-    Object.assign(task, updated);
+    Object.assign(task, updated); // sinkronkan dengan respons server
   } catch (error) {
-    showToast(`Gagal menyimpan perubahan: ${error.message}`);
+    task.selesai = previous; // gagal: kembalikan ke keadaan semula
+    showToast(`Perubahan dibatalkan: ${error.message}`);
   }
   render();
 }
 
 async function deleteTask(task) {
+  const position = tasks.findIndex((entry) => entry.id === task.id);
+  if (position === -1) return;
+
+  tasks.splice(position, 1); // optimistis: baris dihapus lebih dulu
+  render();
+
   try {
     await api(`/api/tugas/${task.id}`, { method: 'DELETE' });
-    tasks = tasks.filter((entry) => entry.id !== task.id);
   } catch (error) {
-    showToast(`Gagal menghapus tugas: ${error.message}`);
+    tasks.splice(position, 0, task); // gagal: kembalikan ke posisi semula
+    showToast(`Penghapusan dibatalkan: ${error.message}`);
   }
   render();
 }
