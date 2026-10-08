@@ -162,8 +162,20 @@
     return balas(404, { message: `Endpoint tidak ditemukan: ${metode} ${alamat.pathname}` });
   }
 
+  function uraiAlamat(input) {
+    const asal = typeof input === 'string' ? input : (input && input.url) || '';
+    // Jalur relatif seperti /api/tugas tidak di-resolve lewat URL(),
+    // karena di file:// hasilnya bergeser jadi /C:/api/tugas.
+    if (asal.startsWith('/')) {
+      const [jalan, tanya] = asal.split('?');
+      return { pathname: jalan.split('#')[0], searchParams: new URLSearchParams(tanya || '') };
+    }
+    const url = new URL(asal, window.location.href);
+    return { pathname: url.pathname, searchParams: url.searchParams };
+  }
+
   window.fetch = async function (input, options = {}) {
-    const alamat = new URL(typeof input === 'string' ? input : input.url, window.location.href);
+    const alamat = uraiAlamat(input);
 
     if (!alamat.pathname.startsWith('/api/')) {
       return fetchAsli(input, options);
