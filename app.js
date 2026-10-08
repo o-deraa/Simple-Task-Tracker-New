@@ -357,6 +357,59 @@ taskDeadline.addEventListener('input', () => {
   clearServerError();
 });
 
+let toastTimer = null;
+
+function showToast(message) {
+  toast.textContent = message;
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.hidden = true;
+  }, 4000);
+}
+
+async function toggleDone(task, done) {
+  try {
+    const updated = await api(`/api/tugas/${task.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selesai: done }),
+    });
+    Object.assign(task, updated);
+  } catch (error) {
+    showToast(`Gagal menyimpan perubahan: ${error.message}`);
+  }
+  render();
+}
+
+async function deleteTask(task) {
+  try {
+    await api(`/api/tugas/${task.id}`, { method: 'DELETE' });
+    tasks = tasks.filter((entry) => entry.id !== task.id);
+  } catch (error) {
+    showToast(`Gagal menghapus tugas: ${error.message}`);
+  }
+  render();
+}
+
+// Satu listener per <ul> melayani checkbox dan tombol hapus, termasuk item baru.
+async function handleTaskClick(event) {
+  const item = event.target.closest('.tugas');
+  if (!item || loadState !== 'ready') return;
+
+  const task = tasks.find((entry) => entry.id === item.dataset.id);
+  if (!task) return;
+
+  if (event.target.matches('.tugas-cek')) {
+    await toggleDone(task, event.target.checked);
+  } else if (event.target.closest('.tugas-hapus')) {
+    await deleteTask(task);
+  }
+}
+
+taskList.addEventListener('click', handleTaskClick);
+longList.addEventListener('click', handleTaskClick);
+
 function themeLabel(theme) {
   themeButton.textContent = theme === 'gelap' ? 'Mode terang' : 'Mode gelap';
 }
