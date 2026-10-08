@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Tracker Kuliah</title>
+  <script>
+    // Dipasang sebelum CSS dirender supaya tema tersimpan tidak berkedip.
+    (function () {
+      var tema = '';
+      try {
+        tema = localStorage.getItem('ttk-tema') || '';
+      } catch (e) {
+        // localStorage diblokir: pakai preferensi sistem.
+      }
+      if (tema !== 'gelap' && tema !== 'terang') {
+        tema = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'gelap' : 'terang';
+      }
+      document.documentElement.dataset.tema = tema;
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wadah">
+    <header class="kepala">
+      <div>
+        <h1>Task Tracker Kuliah</h1>
+        <p class="tagline">Organize your assignments and stay on track.</p>
+      </div>
+      <div class="kepala-aksi">
+        <p id="counter" class="counter" aria-live="polite">Memuat tugas...</p>
+        <button id="theme-button" class="tombol-tema" type="button">Mode gelap</button>
+      </div>
+    </header>
+
+    <ul class="pil" aria-label="Fitur aplikasi">
+      <li class="pil-item">Infinite Lists</li>
+      <li class="pil-item">Focus &amp; Break Pomo Timer</li>
+      <li class="pil-item">Saves Progress</li>
+    </ul>
+
+    <form id="task-form" class="kartu kartu-terang form-tugas" novalidate>
+      <h2 class="judul-bagian">Tambah Tugas</h2>
+
+      <div class="bidang">
+        <label for="task-title">Judul Tugas</label>
+        <input type="text" id="task-title" name="judul" maxlength="120" autocomplete="off"
+          placeholder="Contoh: Kerjakan laporan jaringan" disabled>
+        <p id="error-title" class="form-error" aria-live="polite" hidden></p>
+      </div>
+
+      <div class="baris-bidang">
+        <div class="bidang">
+          <label for="task-course">Mata Kuliah</label>
+          <select id="task-course" name="matkul" disabled>
+            <option value="" selected disabled>Memuat mata kuliah...</option>
+          </select>
+          <p id="error-course" class="form-error" aria-live="polite" hidden></p>
+        </div>
+        <div class="bidang">
+          <label for="task-deadline">Deadline</label>
+          <input type="date" id="task-deadline" name="deadline" disabled>
+          <p id="error-deadline" class="form-error" aria-live="polite" hidden></p>
+        </div>
+      </div>
+
+      <p id="error-server" class="form-error" aria-live="polite" hidden></p>
+      <button id="tombol-tambah" type="submit" class="tombol-utama" disabled>+ Tambah Tugas</button>
+    </form>
+
+    <div class="grid-utama">
+      <section class="kartu kartu-gelap kartu-timer" aria-labelledby="judul-timer">
+        <h2 id="judul-timer" class="judul-bagian judul-bagian--kapital">Focus Timer</h2>
+        <p id="timer-phase" class="timer-fase">Fokus</p>
+        <p id="timer-number" class="timer-angka" role="timer">25:00</p>
+        <div class="timer-kontrol">
+          <button id="start-button" class="tombol-ikon" type="button" aria-label="Mulai timer">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M8 5.5v13l11-6.5z"/>
+            </svg>
+          </button>
+          <button id="pause-button" class="tombol-ikon tombol-ikon--garis" type="button" aria-label="Jeda timer" disabled>
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/>
+            </svg>
+          </button>
+          <button id="reset-button" class="tombol-ikon tombol-ikon--garis" type="button" aria-label="Reset timer">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+              aria-hidden="true" focusable="false">
+              <!-- busur putaran -->
+              <path d="M3.51 15 a9 9 0 1 0 2.13 -9.36 L1 10"/>
+              <!-- kepala panah -->
+              <polyline points="1 4 1 10 7 10"/>
+            </svg>
+          </button>
+        </div>
+        <p class="timer-siklus">
+          <span id="timer-cycle-text" class="sr-only">0 dari 4 siklus fokus selesai</span>
+          <span id="timer-cycles" class="siklus-titik" aria-hidden="true"></span>
+        </p>
+      </section>
+
+      <section class="kartu kartu-gelap kartu-tugas" aria-labelledby="judul-deadline">
+        <h2 id="judul-deadline" class="judul-bagian judul-bagian--kapital">Deadline Terdekat</h2>
+
+        <div class="cari">
+          <label for="search-input" class="sr-only">Cari tugas</label>
+          <input type="search" id="search-input" placeholder="Cari judul tugas..." autocomplete="off" disabled>
+        </div>
+
+        <div class="filter" role="group" aria-label="Filter tugas">
+          <button type="button" class="filter-tombol on" data-filter="semua" aria-pressed="true">Semua</button>
+          <button type="button" class="filter-tombol" data-filter="aktif" aria-pressed="false">Aktif</button>
+          <button type="button" class="filter-tombol" data-filter="selesai" aria-pressed="false">Selesai</button>
+        </div>
+
+        <ul id="task-list" class="daftar-tugas"></ul>
+
+        <div id="loading-state" class="skeleton-box" hidden>
+          <p class="sr-only">Memuat daftar tugas.</p>
+          <div class="skeleton" aria-hidden="true"></div>
+          <div class="skeleton" aria-hidden="true"></div>
+          <div class="skeleton" aria-hidden="true"></div>
+        </div>
+
+        <div id="error-state" class="status-kotak" hidden>
+          <p id="error-message" class="status-pesan"></p>
+          <button id="retry-button" class="tombol-utama" type="button">Coba lagi</button>
+        </div>
+
+        <p id="empty-state" class="kosong" hidden></p>
+
+        <div id="progress" class="progress">
+          <div class="progress-kepala">
+            <span class="progress-label">Progress</span>
+            <span id="progress-count" class="progress-angka">0 OF 0</span>
+            <span id="progress-percent" class="progress-persen">0%</span>
+          </div>
+          <div id="progress-bar" class="progress-track" role="progressbar" aria-label="Progress tugas"
+            aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="progress-fill" class="progress-fill"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section id="kartu-jangka" class="kartu kartu-terang kartu-jangka" aria-labelledby="judul-jangka">
+      <h2 id="judul-jangka" class="judul-bagian judul-bagian--kapital">Tugas Jangka Panjang</h2>
+      <p class="catatan-bagian">Deadline lebih dari 7 hari ke depan.</p>
+      <ul id="long-list" class="daftar-tugas"></ul>
+      <p id="long-empty" class="kosong" hidden>Belum ada tugas jangka panjang.</p>
+    </section>
+
+    <footer class="catatan-halaman">Tugas tersimpan di server.</footer>
+  </main>
+
+  <p id="toast" class="toast" role="status" aria-live="polite" hidden></p>
+
+  <template id="icon-trash">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+      aria-hidden="true" focusable="false">
+      <!-- tutup atas -->
+      <line x1="5" y1="7" x2="19" y2="7"/>
+      <!-- pegangan di atas tutup -->
+      <rect x="10" y="4" width="4" height="3" rx="1"/>
+      <!-- badan tong, menyempit ke bawah -->
+      <path d="M6.5 7 l0.9 12.1 a1.5 1.5 0 0 0 1.5 1.4 h6.2 a1.5 1.5 0 0 0 1.5 -1.4 L17.5 7"/>
+      <!-- dua rigi di dalam tong -->
+      <line x1="10.2" y1="11" x2="10.2" y2="16.5"/>
+      <line x1="13.8" y1="11" x2="13.8" y2="16.5"/>
+    </svg>
+  </template>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
