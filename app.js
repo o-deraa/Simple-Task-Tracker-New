@@ -57,7 +57,6 @@ async function api(url, options = {}) {
       payload = await response.json();
       if (payload && payload.message) message = payload.message;
     } catch {
-      // Respons error bukan JSON: pakai pesan bawaan.
     }
     const error = new Error(message);
     error.status = response.status;
@@ -123,7 +122,7 @@ function isLongTerm(task) {
   return daysUntil(task.deadline) > HARI_JANGKA_PANJANG;
 }
 
-// Deadline diurai manual sebagai tanggal lokal supaya tidak bergeser zona waktu.
+//deadline diurai manual sebagai tanggal lokal supaya tidak bergeser zona waktu.
 function formatDate(iso) {
   const [tahun, bulan, tanggal] = iso.split('-').map(Number);
   return new Date(tahun, bulan - 1, tanggal).toLocaleDateString('id-ID', {
@@ -337,7 +336,7 @@ taskForm.addEventListener('submit', async (event) => {
     taskForm.reset();
     taskTitle.focus();
   } catch (error) {
-    // Error 400 memuat pesan validasi dari server; tampilkan di kolom terkait.
+    // error 400 berisi pesan validasi dari server
     if (error.status === 400 && error.payload && error.payload.field) {
       const field = error.payload.field;
       if (field === 'judul') showError(taskTitle, errorTitle, error.message);
@@ -469,7 +468,7 @@ themeButton.addEventListener('click', () => {
   try {
     localStorage.setItem(THEME_KEY, next);
   } catch {
-    // Tema tetap berlaku untuk sesi ini walau gagal disimpan.
+    // tema tetap berlaku untuk sesi ini walau gagal disimpan.
   }
   themeLabel(next);
 });
@@ -519,7 +518,7 @@ function nextPhase() {
   if (timerPhaseName === 'fokus') {
     cyclesDone += 1;
     if (cyclesDone >= CYCLE_COUNT) {
-      // Empat siklus selesai: timer berhenti dan kembali ke awal.
+      // empat siklus selesai: timer berhenti dan kembali ke awal.
       stopTimer();
       cyclesDone = 0;
       timerPhaseName = 'fokus';
@@ -545,8 +544,7 @@ function stopTimer() {
   timerId = null;
 }
 
-// Kembalikan timer ke kondisi awal: 25 menit fokus, belum ada siklus, berhenti.
-function resetTimer() {
+// kembalikan timer ke kondisi awal
   stopTimer();
   timerPhaseName = 'fokus';
   secondsLeft = FOCUS_SECONDS;
